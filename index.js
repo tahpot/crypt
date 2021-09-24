@@ -19,6 +19,7 @@ function getOpts (opts = {}) {
     memory: opts.memorySize || MEMORY_SIZE,
     iterations: opts.iterations || ITERATIONS,
     parallelism: opts.parallelism || PARALLELISM,
+    hashLength: opts.hashLength || KEY_LENGTH,
     mode: 'argon2i'
   }
 }
