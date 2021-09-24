@@ -1,6 +1,6 @@
 const { secretbox, hash, randomBytes } = require('tweetnacl')
 const { decodeUTF8, encodeUTF8, encodeBase64, decodeBase64 } = require('tweetnacl-util')
-const { argon2id, createSHA512 } = require('hash-wasm')
+import argon2 from 'react-native-argon2'
 
 const NO_PASSWORD = 'A password is required for encryption or decryption.'
 const COULD_NOT_DECRYPT = 'Could not decrypt!'
@@ -16,10 +16,10 @@ const PARALLELISM = 1 // how many threads to spawn. crypt assumes a single-threa
 // istanbul ignore next // for some reason
 function getOpts (opts = {}) {
   return {
-    saltLength: opts.saltLength || SALT_LENGTH,
-    memorySize: opts.memorySize || MEMORY_SIZE,
+    memory: opts.memorySize || MEMORY_SIZE,
     iterations: opts.iterations || ITERATIONS,
-    parallelism: opts.parallelism || PARALLELISM
+    parallelism: opts.parallelism || PARALLELISM,
+    mode: 'argon2i'
   }
 }
 
@@ -31,14 +31,14 @@ module.exports = class Crypt {
     const { saltLength, ...keyOpts } = opts
     // generate a random salt if one is not provided
     if (!salt) { salt = randomBytes(saltLength) }
-    const key = await argon2id({
+    const result = await argon2({
       password,
       salt,
+    }, {
       ...keyOpts,
       hashLength: KEY_LENGTH,
-      hashFunction: createSHA512(),
-      outputType: 'binary'
     })
+    const key = Buffer.from(result.rawHash, 'hex')
     return { key, salt }
   }
 
