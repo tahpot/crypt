@@ -34,10 +34,7 @@ module.exports = class Crypt {
     const result = await argon2({
       password,
       salt,
-    }, {
-      ...keyOpts,
-      hashLength: KEY_LENGTH,
-    })
+    }, opts)
     const key = Buffer.from(result.rawHash, 'hex')
     return { key, salt }
   }
