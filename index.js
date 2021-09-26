@@ -1,25 +1,23 @@
 const { secretbox, hash, randomBytes } = require('tweetnacl')
 const { decodeUTF8, encodeUTF8, encodeBase64, decodeBase64 } = require('tweetnacl-util')
-const { argon2id, createSHA512 } = require('hash-wasm')
+const crypto = require('crypto')
 
 const NO_PASSWORD = 'A password is required for encryption or decryption.'
 const COULD_NOT_DECRYPT = 'Could not decrypt!'
 
-const KEY_LENGTH = 32
-
-const SALT_LENGTH = 16 // size of salt in bytes; argon2 authors recommend 16 (128 bits)
-const MEMORY_SIZE = 2 ** 12 // 2 ** N kilobytes; increase N to raise strength
-const ITERATIONS = 1e2 // 1 and N zeroes; increase N to raise strength
+const N_SIZE = 65536
+const BLOCKSIZE = 8
 const PARALLELISM = 1 // how many threads to spawn. crypt assumes a single-threaded environment.
+const KEY_LENGTH = 64
 
 // convenience method for combining given opts with defaults
 // istanbul ignore next // for some reason
 function getOpts (opts = {}) {
   return {
-    saltLength: opts.saltLength || SALT_LENGTH,
-    memorySize: opts.memorySize || MEMORY_SIZE,
-    iterations: opts.iterations || ITERATIONS,
-    parallelism: opts.parallelism || PARALLELISM
+    n: opts.n || N_SIZE,
+    blocksize: opts.blocksize || BLOCKSIZE,
+    parallelism: opts.parallelism || PARALLELISM,
+    hashLength: opts.hashLength || KEY_LENGTH,
   }
 }
 
@@ -31,13 +29,10 @@ module.exports = class Crypt {
     const { saltLength, ...keyOpts } = opts
     // generate a random salt if one is not provided
     if (!salt) { salt = randomBytes(saltLength) }
-    const key = await argon2id({
-      password,
-      salt,
-      ...keyOpts,
-      hashLength: KEY_LENGTH,
-      hashFunction: createSHA512(),
-      outputType: 'binary'
+    const key = await crypto.scrypt(password, salt, opts.hashLength, {
+      cost: opts.n,
+      blockSize: opts.blocksize,
+      parallelization: opts.parallelism
     })
     return { key, salt }
   }
