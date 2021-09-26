@@ -1,26 +1,23 @@
 const { secretbox, hash, randomBytes } = require('tweetnacl')
 const { decodeUTF8, encodeUTF8, encodeBase64, decodeBase64 } = require('tweetnacl-util')
-import argon2 from 'react-native-argon2'
+import scrypt from 'react-native-scrypt'
 
 const NO_PASSWORD = 'A password is required for encryption or decryption.'
 const COULD_NOT_DECRYPT = 'Could not decrypt!'
 
-const KEY_LENGTH = 32
-
-const SALT_LENGTH = 16 // size of salt in bytes; argon2 authors recommend 16 (128 bits)
-const MEMORY_SIZE = 2 ** 12 // 2 ** N kilobytes; increase N to raise strength
-const ITERATIONS = 1e2 // 1 and N zeroes; increase N to raise strength
+const N_SIZE = 65536
+const BLOCKSIZE = 8
 const PARALLELISM = 1 // how many threads to spawn. crypt assumes a single-threaded environment.
+const KEY_LENGTH = 64
 
 // convenience method for combining given opts with defaults
 // istanbul ignore next // for some reason
 function getOpts (opts = {}) {
   return {
-    memory: opts.memorySize || MEMORY_SIZE,
-    iterations: opts.iterations || ITERATIONS,
+    n: opts.n || N_SIZE,
+    blocksize: opts.blocksize || BLOCKSIZE,
     parallelism: opts.parallelism || PARALLELISM,
     hashLength: opts.hashLength || KEY_LENGTH,
-    mode: 'argon2i'
   }
 }
 
@@ -31,12 +28,9 @@ module.exports = class Crypt {
     opts = getOpts(opts)
     const { saltLength, ...keyOpts } = opts
     // generate a random salt if one is not provided
-    if (!salt) { salt = randomBytes(saltLength) }
-    const result = await argon2({
-      password,
-      salt,
-    }, opts)
-    const key = Buffer.from(result.rawHash, 'hex')
+    if (!salt) { salt = randomBytes(saltLength) 
+    const hash = await scrypt(password, salt, opts.n, opts.blocksize, opts.parallelism, KEY_LENGTH, 'legacy')
+    const key = Buffer.from(hash, 'hex')
     return { key, salt }
   }
 
