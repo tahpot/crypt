@@ -1,23 +1,22 @@
 const { secretbox, hash, randomBytes } = require('tweetnacl')
 const { decodeUTF8, encodeUTF8, encodeBase64, decodeBase64 } = require('tweetnacl-util')
-const crypto = require('crypto')
+const pbkdf2 = require('pbkdf2')
 
 const NO_PASSWORD = 'A password is required for encryption or decryption.'
 const COULD_NOT_DECRYPT = 'Could not decrypt!'
 
-const N_SIZE = 65536
-const BLOCKSIZE = 8
-const PARALLELISM = 1 // how many threads to spawn. crypt assumes a single-threaded environment.
-const KEY_LENGTH = 64
+const ITERATIONS = 310000
+const ALGORITHM = 'sha512'
+const KEY_LENGTH = 32
+const SALT_LENGTH = 32
 
 // convenience method for combining given opts with defaults
 // istanbul ignore next // for some reason
 function getOpts (opts = {}) {
   return {
-    n: opts.n || N_SIZE,
-    blocksize: opts.blocksize || BLOCKSIZE,
-    parallelism: opts.parallelism || PARALLELISM,
-    hashLength: opts.hashLength || KEY_LENGTH,
+    iterations: opts.iterations || ITERATIONS,
+    algorithm: opts.alogrithm || ALGORITHM,
+    hashLength: opts.hashLength || KEY_LENGTH
   }
 }
 
@@ -26,15 +25,20 @@ module.exports = class Crypt {
   static async deriveKey (password, salt, opts = {}) {
     // parse opts
     opts = getOpts(opts)
-    const { saltLength, ...keyOpts } = opts
     // generate a random salt if one is not provided
-    if (!salt) { salt = randomBytes(saltLength) }
-    const key = await crypto.scrypt(password, salt, opts.hashLength, {
-      cost: opts.n,
-      blockSize: opts.blocksize,
-      parallelization: opts.parallelism
+    if (!salt) {
+      salt = Buffer.from(randomBytes(SALT_LENGTH))
+    } else {
+      salt = Buffer.from(salt, 'hex')
+    }
+    return new Promise((resolve, reject) => {
+      pbkdf2.pbkdf2(password, salt, opts.iterations, opts.hashLength, opts.algorithm, (err, key) => {
+        if (err) {
+          return reject(err)
+        }
+        resolve({ key, salt })
+      })
     })
-    return { key, salt }
   }
 
   // create a new Crypt instance from
